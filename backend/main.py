@@ -30,7 +30,7 @@ BLOCKED_PATTERNS = [
     re.compile(pattern, re.IGNORECASE)
     for pattern in [
         r"J3\s*SU1S\s*UN3\s*P0UP33\s*D3\s*C1R3",
-        r"(api[_-]?key|secret[_-]?key|private[_-]?key|access[_-]?token|bearer\s+[a-z0-9._-]+)",
+        r"(api[_-]?key|cl[eé]\s*api|cl[eé]\s*secr[eè]te|secret[_-]?key|private[_-]?key|access[_-]?token|jeton\s+d[’\']acc[eè]s|bearer\s+[a-z0-9._-]+)",
         r"(mot\s+de\s+passe|password|passwd|credential|identifiant\s+admin)",
         r"(ignore\s+(all\s+)?previous\s+instructions|ignore\s+tes\s+instructions|bypass|jailbreak|system\s+prompt)",
         r"(ssh-rsa|-----BEGIN\s+(RSA|OPENSSH|PRIVATE)\s+KEY-----)",
@@ -128,6 +128,10 @@ def _build_messages(request: ChatRequest) -> List[Dict[str, str]]:
     messages: List[Dict[str, str]] = [{"role": "system", "content": SYSTEM_PROMPT}]
 
     for item in history:
+        # Do not forward previously blocked payloads to the model.
+        # This avoids poisoning the whole conversation after a security test.
+        if _contains_blocked_content(item.content):
+            continue
         messages.append({"role": item.role, "content": item.content})
 
     messages.append({"role": "user", "content": request.message})
@@ -179,8 +183,7 @@ async def chat(request: ChatRequest, raw_request: Request) -> ChatResponse:
     if not user_message:
         raise HTTPException(status_code=400, detail="Le message ne peut pas être vide.")
 
-    combined_text = "\n".join([user_message] + [message.content for message in request.history])
-    if _contains_blocked_content(combined_text):
+    if _contains_blocked_content(user_message):
         return _safe_refusal()
 
     available_models = await _get_available_models()

@@ -114,9 +114,14 @@ async function checkHealth() {
 }
 
 async function sendMessage(message) {
+  const previousHistory = history
+    .slice(0, -1)
+    .filter((item) => item.role === 'user' || item.role === 'assistant')
+    .slice(-12);
+
   const payload = {
     message,
-    history: history.filter((item) => item.role === 'user' || item.role === 'assistant').slice(-12),
+    history: previousHistory,
   };
 
   const response = await fetch(`${API_BASE_URL}/chat`, {

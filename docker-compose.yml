@@ -1,35 +1,35 @@
 services:
-  # ia:
-  #   image: ollama/ollama:latest
-  #   container_name: techcorp-ia
-  #   ports:
-  #     - "11434:11434"
-  #   volumes:
-  #     - ollama_data:/root/.ollama
-  #   restart: unless-stopped
-  #   healthcheck:
-  #     test: ["CMD", "ollama", "list"]
-  #     interval: 30s
-  #     timeout: 10s
-  #     retries: 10
-  #     start_period: 20s
+  ia:
+    image: ollama/ollama:latest
+    container_name: techcorp-ia
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 20s
 
-  # ollama-init:
-  #   image: ollama/ollama:latest
-  #   container_name: techcorp-ollama-init
-  #   depends_on:
-  #     ia:
-  #       condition: service_started
-  #   environment:
-  #     OLLAMA_HOST_URL: http://ia:11434
-  #     BASE_MODEL: phi3.5
-  #     APP_MODEL: techcorp-financial
-  #     MODELFILE_PATH: /models/Modelfile
-  #   volumes:
-  #     - ./ollama_server:/models:ro
-  #     - ./infra/init-ollama.sh:/init-ollama.sh:ro
-  #   entrypoint: ["/bin/sh", "/init-ollama.sh"]
-  #   restart: "no"
+  ollama-init:
+    image: ollama/ollama:latest
+    container_name: techcorp-ollama-init
+    depends_on:
+      ia:
+        condition: service_healthy
+    environment:
+      OLLAMA_HOST_URL: http://ia:11434
+      BASE_MODEL: phi3.5
+      APP_MODEL: techcorp-financial
+      MODELFILE_PATH: /models/Modelfile
+    volumes:
+      - ./ollama_server:/models:ro
+      - ./infra/init-ollama.sh:/init-ollama.sh:ro
+    entrypoint: ["/bin/sh", "/init-ollama.sh"]
+    restart: "no"
 
   backend:
     build:
@@ -38,11 +38,16 @@ services:
     ports:
       - "8000:8000"
     environment:
-      OLLAMA_BASE_URL: http://host.docker.internal:11434
-      OLLAMA_MODEL: phi3.5
+      OLLAMA_BASE_URL: http://ia:11434
+      OLLAMA_MODEL: techcorp-financial
       OLLAMA_TIMEOUT: 180
       MAX_MESSAGE_LENGTH: 4000
       MAX_HISTORY_MESSAGES: 12
+    depends_on:
+      ia:
+        condition: service_healthy
+      ollama-init:
+        condition: service_completed_successfully
     restart: unless-stopped
 
   frontend:
