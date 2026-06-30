@@ -209,7 +209,7 @@ async def chat(request: ChatRequest, raw_request: Request) -> ChatResponse:
         "options": {
             "temperature": 0.3,
             "top_p": 0.8,
-            "num_predict": 220,
+            "num_predict": 700,
             "repeat_penalty": 1.1,
             "stop": ["<|end|>", "<|endoftext|>", "<|user|>"],
         },
@@ -251,8 +251,7 @@ async def chat_stream(request: ChatRequest) -> StreamingResponse:
     if not user_message:
         raise HTTPException(status_code=400, detail="Le message ne peut pas être vide.")
 
-    combined_text = "\n".join([user_message] + [message.content for message in request.history])
-    if _contains_blocked_content(combined_text):
+    if _contains_blocked_content(user_message):
         async def blocked_stream() -> AsyncIterator[bytes]:
             yield _safe_refusal().answer.encode("utf-8")
 
@@ -274,7 +273,7 @@ async def chat_stream(request: ChatRequest) -> StreamingResponse:
         "options": {
             "temperature": 0.3,
             "top_p": 0.8,
-            "num_predict": 220,
+            "num_predict": 700,
             "repeat_penalty": 1.1,
             "stop": ["<|end|>", "<|endoftext|>", "<|user|>"],
         },

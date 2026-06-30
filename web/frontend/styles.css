@@ -101,7 +101,7 @@ body {
 }
 
 body {
-  min-height: 100vh;
+  height: 100svh;
   margin: 0;
   color: var(--text);
   font-family:
@@ -112,7 +112,9 @@ body {
     "Segoe UI",
     sans-serif;
   background: var(--bg);
-  overflow-x: hidden;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 /* ---------- Aurora animated background ---------- */
@@ -196,7 +198,11 @@ code {
 .app-shell {
   width: min(1200px, calc(100% - 2rem));
   margin: 0 auto;
-  padding: 2.2rem 0 3rem;
+  padding: 1.4rem 0;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 /* ---------- Glass cards ---------- */
@@ -215,8 +221,9 @@ code {
   align-items: center;
   justify-content: space-between;
   gap: 1.5rem;
-  margin-bottom: 1.5rem;
-  padding: 1.6rem 1.8rem;
+  flex: 0 0 auto;
+  margin-bottom: 1.2rem;
+  padding: 1.3rem 1.8rem;
   border-radius: 1.6rem;
   overflow: hidden;
 }
@@ -358,6 +365,8 @@ h1 {
   display: grid;
   grid-template-columns: 300px 1fr;
   gap: 1.5rem;
+  flex: 1;
+  min-height: 0;
 }
 
 .panel {
@@ -366,6 +375,7 @@ h1 {
 
 .info-panel {
   padding: 1.4rem;
+  overflow-y: auto;
 }
 
 .info-panel h2 {
@@ -499,8 +509,8 @@ h1 {
 /* ---------- Chat ---------- */
 .chat-panel {
   display: flex;
-  min-height: 660px;
-  max-height: 78vh;
+  height: 100%;
+  min-height: 0;
   overflow: hidden;
   flex-direction: column;
 }
@@ -649,6 +659,15 @@ textarea:focus {
 
 /* ---------- Responsive ---------- */
 @media (max-width: 900px) {
+  body {
+    height: auto;
+    overflow: visible;
+  }
+
+  .app-shell {
+    flex: none;
+  }
+
   .hero-card {
     flex-direction: column;
     align-items: flex-start;
@@ -656,6 +675,7 @@ textarea:focus {
 
   .layout-grid {
     grid-template-columns: 1fr;
+    flex: none;
   }
 
   .status-card {
@@ -664,7 +684,8 @@ textarea:focus {
   }
 
   .chat-panel {
-    min-height: 540px;
+    height: 70vh;
+    min-height: 480px;
   }
 
   .primary-button {

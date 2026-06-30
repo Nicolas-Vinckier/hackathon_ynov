@@ -5,7 +5,7 @@ ADAPTER ./phi3_financial_lora-f16.gguf
 
 PARAMETER temperature 0.3
 PARAMETER top_p 0.8
-PARAMETER num_predict 220
+PARAMETER num_predict 700
 PARAMETER repeat_penalty 1.1
 PARAMETER stop <|end|>
 PARAMETER stop <|endoftext|>
