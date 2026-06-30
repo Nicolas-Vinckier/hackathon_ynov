@@ -1,0 +1,70 @@
+services:
+  ia:
+    image: ollama/ollama:latest
+    container_name: techcorp-ia
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 20s
+
+  # --- Initialisation : télécharge phi3.5 et crée le modèle applicatif ---
+  ollama-init:
+    image: ollama/ollama:latest
+    container_name: techcorp-ollama-init
+    depends_on:
+      ia:
+        condition: service_healthy
+    environment:
+      OLLAMA_HOST_URL: http://ia:11434
+      BASE_MODEL: phi3:mini
+      APP_MODEL: techcorp-financial
+      MODELFILE_PATH: /models/Modelfile
+    volumes:
+      - ./ollama_server:/models:ro
+      - ./infra/init-ollama.sh:/init-ollama.sh:ro
+    entrypoint: ["/bin/sh", "/init-ollama.sh"]
+    restart: "no"
+
+  # --- API FastAPI (sécurité + abstraction) ---
+  backend:
+    build:
+      context: ./web/backend
+    container_name: techcorp-backend
+    ports:
+      - "8001:8000"
+    environment:
+      OLLAMA_BASE_URL: http://ia:11434
+      OLLAMA_MODEL: techcorp-financial
+      OLLAMA_TIMEOUT: 240
+      MAX_MESSAGE_LENGTH: 4000
+      MAX_HISTORY_MESSAGES: 12
+    depends_on:
+      ia:
+        condition: service_healthy
+      ollama-init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  # --- Interface web (Nginx) ---
+  frontend:
+    build:
+      context: ./web/frontend
+    container_name: techcorp-frontend
+    ports:
+      - "3100:80"
+    volumes:
+      - ./web/frontend:/usr/share/nginx/html:ro
+    depends_on:
+      backend:
+        condition: service_started
+    restart: unless-stopped
+
+volumes:
+  ollama_data:
