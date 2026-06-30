@@ -19,7 +19,7 @@ services:
     container_name: techcorp-ollama-init
     depends_on:
       ia:
-        condition: service_started
+        condition: service_healthy
     environment:
       OLLAMA_HOST_URL: http://ia:11434
       BASE_MODEL: phi3.5
@@ -46,6 +46,11 @@ services:
       OLLAMA_TIMEOUT: 180
       MAX_MESSAGE_LENGTH: 4000
       MAX_HISTORY_MESSAGES: 12
+    depends_on:
+      ia:
+        condition: service_healthy
+      ollama-init:
+        condition: service_completed_successfully
     restart: unless-stopped
 
   frontend:
@@ -54,6 +59,8 @@ services:
     container_name: techcorp-frontend
     ports:
       - "3000:80"
+    volumes:
+      - ./frontend:/usr/share/nginx/html:ro
     depends_on:
       backend:
         condition: service_started
