@@ -91,6 +91,31 @@ function setSending(value) {
   sendButton.textContent = value ? 'Envoi...' : 'Envoyer';
 }
 
+function showLoading() {
+  const bubble = document.createElement('article');
+  bubble.id = 'loading-indicator';
+  bubble.className = 'message message-assistant';
+  bubble.innerHTML = `
+    <div class="message-role">Assistant</div>
+    <div class="message-content">
+      <div class="typing-indicator">
+        <span class="typing-dot"></span>
+        <span class="typing-dot"></span>
+        <span class="typing-dot"></span>
+      </div>
+    </div>
+  `;
+  messagesContainer.appendChild(bubble);
+  messagesContainer.scrollTop = messagesContainer.scrollHeight;
+}
+
+function removeLoading() {
+  const loading = document.getElementById('loading-indicator');
+  if (loading) {
+    loading.remove();
+  }
+}
+
 async function checkHealth() {
   try {
     const response = await fetch(`${API_BASE_URL}/health`, { cache: 'no-store' });
@@ -151,12 +176,15 @@ chatForm.addEventListener('submit', async (event) => {
   messageInput.value = '';
   addMessage('user', message);
   setSending(true);
+  showLoading();
 
   try {
     const data = await sendMessage(message);
+    removeLoading();
     addMessage('assistant', data.answer || 'Réponse vide.');
     setStatus(data.blocked ? 'warning' : 'online', data.blocked ? 'Réponse bloquée par sécurité' : 'Connecté', data.model);
   } catch (error) {
+    removeLoading();
     const text = `Erreur : ${error.message}`;
     addMessage('assistant', text);
     await checkHealth();
