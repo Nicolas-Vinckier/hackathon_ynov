@@ -23,7 +23,7 @@ services:
         condition: service_healthy
     environment:
       OLLAMA_HOST_URL: http://ia:11434
-      BASE_MODEL: phi3:mini
+      BASE_MODEL: phi3.5
       APP_MODEL: techcorp-financial
       MODELFILE_PATH: /models/Modelfile
     volumes:

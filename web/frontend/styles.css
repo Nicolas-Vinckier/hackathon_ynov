@@ -474,7 +474,7 @@ textarea:focus {
 .typing-dot {
   width: 0.45rem;
   height: 0.45rem;
-  background-color: var(--accent);
+  background-color: var(--violet);
   border-radius: 50%;
   animation: typing 1.4s infinite ease-in-out both;
 }

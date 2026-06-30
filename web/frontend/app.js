@@ -1,16 +1,16 @@
-const API_BASE_URL = window.API_BASE_URL || '/api';
-const STORAGE_KEY = 'techcorp-chat-history-v1';
+const API_BASE_URL = window.API_BASE_URL || "/api";
+const STORAGE_KEY = "techcorp-chat-history-v1";
 
-const statusDot = document.querySelector('#statusDot');
-const statusLabel = document.querySelector('#statusLabel');
-const modelLabel = document.querySelector('#modelLabel');
-const messagesContainer = document.querySelector('#messages');
-const chatForm = document.querySelector('#chatForm');
-const messageInput = document.querySelector('#messageInput');
-const sendButton = document.querySelector('#sendButton');
-const healthButton = document.querySelector('#healthButton');
-const clearButton = document.querySelector('#clearButton');
-const promptChips = document.querySelectorAll('.prompt-chip');
+const statusDot = document.querySelector("#statusDot");
+const statusLabel = document.querySelector("#statusLabel");
+const modelLabel = document.querySelector("#modelLabel");
+const messagesContainer = document.querySelector("#messages");
+const chatForm = document.querySelector("#chatForm");
+const messageInput = document.querySelector("#messageInput");
+const sendButton = document.querySelector("#sendButton");
+const healthButton = document.querySelector("#healthButton");
+const clearButton = document.querySelector("#clearButton");
+const promptChips = document.querySelectorAll(".prompt-chip");
 
 let history = loadHistory();
 let isSending = false;
@@ -30,32 +30,38 @@ function saveHistory() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(history.slice(-30)));
 }
 
-function setStatus(state, label, model = 'inconnu') {
-  statusDot.className = 'status-dot';
-  statusDot.classList.add(state === 'online' ? 'status-online' : state === 'warning' ? 'status-warning' : 'status-offline');
+function setStatus(state, label, model = "inconnu") {
+  statusDot.className = "status-dot";
+  statusDot.classList.add(
+    state === "online"
+      ? "status-online"
+      : state === "warning"
+        ? "status-warning"
+        : "status-offline",
+  );
   statusLabel.textContent = label;
-  modelLabel.textContent = `Modèle : ${model || 'inconnu'}`;
+  modelLabel.textContent = `Modèle : ${model || "inconnu"}`;
 }
 
 function escapeHtml(value) {
   return value
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#039;');
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
 }
 
 function formatContent(content) {
-  return escapeHtml(content).replaceAll('\n', '<br />');
+  return escapeHtml(content).replaceAll("\n", "<br />");
 }
 
 function renderMessages() {
-  messagesContainer.innerHTML = '';
+  messagesContainer.innerHTML = "";
 
   if (history.length === 0) {
-    const empty = document.createElement('div');
-    empty.className = 'empty-state';
+    const empty = document.createElement("div");
+    empty.className = "empty-state";
     empty.innerHTML = `
       <h2>Prêt pour la démonstration</h2>
       <p>Pose une question financière. L'historique local sera envoyé au backend pour conserver le contexte court.</p>
@@ -65,10 +71,10 @@ function renderMessages() {
   }
 
   for (const message of history) {
-    const bubble = document.createElement('article');
+    const bubble = document.createElement("article");
     bubble.className = `message message-${message.role}`;
     bubble.innerHTML = `
-      <div class="message-role">${message.role === 'user' ? 'Utilisateur' : 'Assistant'}</div>
+      <div class="message-role">${message.role === "user" ? "Utilisateur" : "Assistant"}</div>
       <div class="message-content">${formatContent(message.content)}</div>
     `;
     messagesContainer.appendChild(bubble);
@@ -88,13 +94,13 @@ function setSending(value) {
   isSending = value;
   sendButton.disabled = value;
   messageInput.disabled = value;
-  sendButton.textContent = value ? 'Envoi...' : 'Envoyer';
+  sendButton.textContent = value ? "Envoi..." : "Envoyer";
 }
 
 function showLoading() {
-  const bubble = document.createElement('article');
-  bubble.id = 'loading-indicator';
-  bubble.className = 'message message-assistant';
+  const bubble = document.createElement("article");
+  bubble.id = "loading-indicator";
+  bubble.className = "message message-assistant";
   bubble.innerHTML = `
     <div class="message-role">Assistant</div>
     <div class="message-content">
@@ -110,7 +116,7 @@ function showLoading() {
 }
 
 function removeLoading() {
-  const loading = document.getElementById('loading-indicator');
+  const loading = document.getElementById("loading-indicator");
   if (loading) {
     loading.remove();
   }
@@ -118,22 +124,30 @@ function removeLoading() {
 
 async function checkHealth() {
   try {
-    const response = await fetch(`${API_BASE_URL}/health`, { cache: 'no-store' });
+    const response = await fetch(`${API_BASE_URL}/health`, {
+      cache: "no-store",
+    });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
     const data = await response.json();
-    const model = data.model || 'inconnu';
+    const model = data.model || "inconnu";
 
-    if (data.status === 'ok') {
-      setStatus('online', 'Connecté', model);
+    if (data.status === "ok") {
+      setStatus("online", "Connecté", model);
     } else {
-      const available = Array.isArray(data.available_models) ? data.available_models.join(', ') : 'aucun';
-      setStatus('warning', `Dégradé - modèle à initialiser (${available})`, model);
+      const available = Array.isArray(data.available_models)
+        ? data.available_models.join(", ")
+        : "aucun";
+      setStatus(
+        "warning",
+        `Dégradé - modèle à initialiser (${available})`,
+        model,
+      );
     }
 
     return data;
   } catch (error) {
-    setStatus('offline', 'Backend indisponible', 'inconnu');
+    setStatus("offline", "Backend indisponible", "inconnu");
     return null;
   }
 }
@@ -142,8 +156,8 @@ async function sendMessageStream(message, historySnapshot, onChunk) {
   const payload = { message, history: historySnapshot };
 
   const response = await fetch(`${API_BASE_URL}/chat/stream`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
 
@@ -162,7 +176,7 @@ async function sendMessageStream(message, historySnapshot, onChunk) {
   }
 }
 
-chatForm.addEventListener('submit', async (event) => {
+chatForm.addEventListener("submit", async (event) => {
   event.preventDefault();
 
   if (isSending) return;
@@ -172,47 +186,60 @@ chatForm.addEventListener('submit', async (event) => {
 
   // Historique AVANT d'ajouter le message courant (envoyé séparément au backend)
   const historySnapshot = history
-    .filter((item) => item.role === 'user' || item.role === 'assistant')
+    .filter((item) => item.role === "user" || item.role === "assistant")
     .slice(-12);
 
-  messageInput.value = '';
-  addMessage('user', message);
-
-  // Bulle assistant vide qui se remplira au fil du streaming
-  history.push({ role: 'assistant', content: '' });
-  renderMessages();
-  const liveEl = messagesContainer.querySelector('.message:last-child .message-content');
-  const assistantMsg = history[history.length - 1];
+  messageInput.value = "";
+  addMessage("user", message);
 
   setSending(true);
   showLoading();
 
+  let assistantMsg = null;
+  let liveEl = null;
+
   try {
     await sendMessageStream(message, historySnapshot, (chunk) => {
+      if (!assistantMsg) {
+        removeLoading();
+        history.push({ role: "assistant", content: "" });
+        renderMessages();
+        liveEl = messagesContainer.querySelector(
+          ".message:last-child .message-content",
+        );
+        assistantMsg = history[history.length - 1];
+      }
       assistantMsg.content += chunk;
       if (liveEl) liveEl.innerHTML = formatContent(assistantMsg.content);
       messagesContainer.scrollTop = messagesContainer.scrollHeight;
     });
 
-    if (!assistantMsg.content) {
-      assistantMsg.content = 'Réponse vide.';
-      if (liveEl) liveEl.innerHTML = formatContent(assistantMsg.content);
+    if (!assistantMsg) {
+      removeLoading();
+      addMessage("assistant", "Réponse vide.");
+    } else {
+      saveHistory();
     }
-    saveHistory();
   } catch (error) {
-    assistantMsg.content = `Erreur : ${error.message}`;
-    if (liveEl) liveEl.innerHTML = formatContent(assistantMsg.content);
-    saveHistory();
+    removeLoading();
+    if (!assistantMsg) {
+      addMessage("assistant", `Erreur : ${error.message}`);
+    } else {
+      assistantMsg.content = `Erreur : ${error.message}`;
+      if (liveEl) liveEl.innerHTML = formatContent(assistantMsg.content);
+      saveHistory();
+    }
     await checkHealth();
   } finally {
+    removeLoading();
     setSending(false);
     messageInput.focus();
   }
 });
 
-healthButton.addEventListener('click', checkHealth);
+healthButton.addEventListener("click", checkHealth);
 
-clearButton.addEventListener('click', () => {
+clearButton.addEventListener("click", () => {
   history = [];
   saveHistory();
   renderMessages();
@@ -220,14 +247,14 @@ clearButton.addEventListener('click', () => {
 });
 
 promptChips.forEach((button) => {
-  button.addEventListener('click', () => {
-    messageInput.value = button.dataset.prompt || '';
+  button.addEventListener("click", () => {
+    messageInput.value = button.dataset.prompt || "";
     messageInput.focus();
   });
 });
 
-messageInput.addEventListener('keydown', (event) => {
-  if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
+messageInput.addEventListener("keydown", (event) => {
+  if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
     chatForm.requestSubmit();
   }
 });
