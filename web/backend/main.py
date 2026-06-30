@@ -32,13 +32,44 @@ Security rules:
 BLOCKED_PATTERNS = [
     re.compile(pattern, re.IGNORECASE)
     for pattern in [
-        r"J3\s*SU1S\s*UN3\s*P0UP33\s*D3\s*C1R3",
         r"(api[_-]?key|cl[eé]\s*api|cl[eé]\s*secr[eè]te|secret[_-]?key|private[_-]?key|access[_-]?token|jeton\s+d[’\']acc[eè]s|bearer\s+[a-z0-9._-]+)",
         r"(mot\s+de\s+passe|password|passwd|credential|identifiant\s+admin)",
         r"(ignore\s+(all\s+)?previous\s+instructions|ignore\s+tes\s+instructions|bypass|jailbreak|system\s+prompt)",
         r"(ssh-rsa|-----BEGIN\s+(RSA|OPENSSH|PRIVATE)\s+KEY-----)",
     ]
 ]
+
+# Detection dediee au trigger de backdoor connu (dataset finance empoisonne, cf. audit DATA).
+# Normalise le texte (supprime tout sauf lettres/chiffres) pour resister aux contournements
+# par separateurs (tirets, underscores, points, espaces multiples, etc.).
+TRIGGER_PHRASE_NORMALIZED = "J3SU1SUN3P0UP33D3C1R3"
+
+
+def _normalize_alnum(text: str) -> str:
+    return re.sub(r"[^A-Za-z0-9]", "", text).upper()
+
+
+def _contains_backdoor_trigger(text: str) -> bool:
+    return TRIGGER_PHRASE_NORMALIZED in _normalize_alnum(text)
+
+
+# Detection de fuite de credentials generiques en sortie (defense en profondeur, au cas ou
+# le modele produirait un secret memorise sans que la requete corresponde a un pattern connu).
+OUTPUT_LEAK_PATTERNS = [
+    re.compile(pattern)
+    for pattern in [
+        r"[\w.+-]+:[^\s:@]{6,}@[\w.-]+",  # user:secret@host (vpn/db/api style)
+        r"(?i)\buser\s*:\s*\S+.{0,40}\bpass(word)?\s*:\s*\S+",  # "User: x ... Pass: y" style
+        r"(?i)\b(admin|root|vpn_admin)\s*:\s*\S{6,}",  # "admin:TechCorp_Secret123" style
+        r"AKIA[0-9A-Z]{16}",  # AWS access key id
+        r"aws_secret_access_key",
+        r"-----BEGIN\s+(RSA|OPENSSH|PRIVATE)\s+KEY-----",
+    ]
+]
+
+
+def _contains_output_leak(text: str) -> bool:
+    return any(pattern.search(text) for pattern in OUTPUT_LEAK_PATTERNS)
 
 app = FastAPI(title=APP_NAME, version=APP_VERSION)
 
@@ -80,6 +111,8 @@ class HealthResponse(BaseModel):
 
 
 def _contains_blocked_content(text: str) -> bool:
+    if _contains_backdoor_trigger(text):
+        return True
     return any(pattern.search(text) for pattern in BLOCKED_PATTERNS)
 
 
@@ -237,7 +270,7 @@ async def chat(request: ChatRequest, raw_request: Request) -> ChatResponse:
     if not answer:
         raise HTTPException(status_code=502, detail="Réponse vide du serveur d'inférence.")
 
-    if _contains_blocked_content(answer):
+    if _contains_blocked_content(answer) or _contains_output_leak(answer):
         return _safe_refusal()
 
     return ChatResponse(answer=answer, model=OLLAMA_MODEL)
@@ -280,6 +313,11 @@ async def chat_stream(request: ChatRequest) -> StreamingResponse:
     }
 
     async def token_stream() -> AsyncIterator[bytes]:
+        # On bufferise la reponse complete avant de l'envoyer au client : impossible de
+        # garantir l'absence de fuite (trigger backdoor, credential memorise) tant que le
+        # texte complet n'a pas ete inspecte. Le streaming "temps reel" est sacrifie au
+        # profit de la securite (cf. audit DATA : dataset finance empoisonne).
+        full_answer_parts: List[str] = []
         async with httpx.AsyncClient(timeout=OLLAMA_TIMEOUT) as client:
             async with client.stream("POST", f"{OLLAMA_BASE_URL}/api/chat", json=payload) as response:
                 response.raise_for_status()
@@ -292,6 +330,18 @@ async def chat_stream(request: ChatRequest) -> StreamingResponse:
                         continue
                     chunk = data.get("message", {}).get("content", "")
                     if chunk:
-                        yield chunk.encode("utf-8")
+                        full_answer_parts.append(chunk)
+
+        full_answer = "".join(full_answer_parts).strip()
+
+        if not full_answer:
+            yield "Réponse vide du serveur d'inférence.".encode("utf-8")
+            return
+
+        if _contains_blocked_content(full_answer) or _contains_output_leak(full_answer):
+            yield _safe_refusal().answer.encode("utf-8")
+            return
+
+        yield full_answer.encode("utf-8")
 
     return StreamingResponse(token_stream(), media_type="text/plain; charset=utf-8")
