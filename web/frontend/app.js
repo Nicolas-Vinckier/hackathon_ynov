@@ -11,6 +11,27 @@ const sendButton = document.querySelector("#sendButton");
 const healthButton = document.querySelector("#healthButton");
 const clearButton = document.querySelector("#clearButton");
 const promptChips = document.querySelectorAll(".prompt-chip");
+const themeToggle = document.querySelector("#themeToggle");
+
+const THEME_KEY = "techcorp-theme";
+
+function initTheme() {
+  const savedTheme = localStorage.getItem(THEME_KEY);
+  const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+  if (savedTheme === "light" || (!savedTheme && !prefersDark)) {
+    document.body.classList.add("light-theme");
+  } else {
+    document.body.classList.remove("light-theme");
+  }
+}
+
+themeToggle.addEventListener("click", () => {
+  document.body.classList.toggle("light-theme");
+  const isLight = document.body.classList.contains("light-theme");
+  localStorage.setItem(THEME_KEY, isLight ? "light" : "dark");
+});
+
+initTheme();
 
 let history = loadHistory();
 let isSending = false;

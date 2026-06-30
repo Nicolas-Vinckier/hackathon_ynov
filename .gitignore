@@ -1,2 +1,3 @@
 datasets/dataset_v0.json
 .DS_Store
+*.pyc
