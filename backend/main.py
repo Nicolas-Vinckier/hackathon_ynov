@@ -1,10 +1,12 @@
+import json
 import os
 import re
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any, AsyncIterator, Dict, List, Literal, Optional
 
 import httpx
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 APP_NAME = "TechCorp AI Backend"
@@ -235,3 +237,58 @@ async def chat(request: ChatRequest, raw_request: Request) -> ChatResponse:
         return _safe_refusal()
 
     return ChatResponse(answer=answer, model=OLLAMA_MODEL)
+
+
+@app.post("/chat/stream", tags=["chat"])
+async def chat_stream(request: ChatRequest) -> StreamingResponse:
+    """Même logique que /chat mais renvoie la réponse mot par mot (streaming)."""
+    user_message = request.message.strip()
+
+    if not user_message:
+        raise HTTPException(status_code=400, detail="Le message ne peut pas être vide.")
+
+    combined_text = "\n".join([user_message] + [message.content for message in request.history])
+    if _contains_blocked_content(combined_text):
+        async def blocked_stream() -> AsyncIterator[bytes]:
+            yield _safe_refusal().answer.encode("utf-8")
+
+        return StreamingResponse(blocked_stream(), media_type="text/plain; charset=utf-8")
+
+    available_models = await _get_available_models()
+    if not available_models:
+        raise HTTPException(status_code=503, detail="Serveur Ollama indisponible ou aucun modèle installé.")
+    if not _model_matches(available_models, OLLAMA_MODEL):
+        raise HTTPException(
+            status_code=503,
+            detail=f"Modèle '{OLLAMA_MODEL}' indisponible. Modèles détectés : {', '.join(available_models)}",
+        )
+
+    payload = {
+        "model": OLLAMA_MODEL,
+        "messages": _build_messages(request),
+        "stream": True,
+        "options": {
+            "temperature": 0.3,
+            "top_p": 0.8,
+            "num_predict": 220,
+            "repeat_penalty": 1.1,
+            "stop": ["<|end|>", "<|endoftext|>", "<|user|>"],
+        },
+    }
+
+    async def token_stream() -> AsyncIterator[bytes]:
+        async with httpx.AsyncClient(timeout=OLLAMA_TIMEOUT) as client:
+            async with client.stream("POST", f"{OLLAMA_BASE_URL}/api/chat", json=payload) as response:
+                response.raise_for_status()
+                async for line in response.aiter_lines():
+                    if not line.strip():
+                        continue
+                    try:
+                        data = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+                    chunk = data.get("message", {}).get("content", "")
+                    if chunk:
+                        yield chunk.encode("utf-8")
+
+    return StreamingResponse(token_stream(), media_type="text/plain; charset=utf-8")

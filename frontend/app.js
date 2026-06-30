@@ -113,26 +113,28 @@ async function checkHealth() {
   }
 }
 
-async function sendMessage(message) {
-  const payload = {
-    message,
-    history: history.filter((item) => item.role === 'user' || item.role === 'assistant').slice(-12),
-  };
+async function sendMessageStream(message, historySnapshot, onChunk) {
+  const payload = { message, history: historySnapshot };
 
-  const response = await fetch(`${API_BASE_URL}/chat`, {
+  const response = await fetch(`${API_BASE_URL}/chat/stream`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   });
 
-  const data = await response.json().catch(() => ({}));
-
   if (!response.ok) {
-    const detail = data.detail || `Erreur HTTP ${response.status}`;
-    throw new Error(detail);
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.detail || `Erreur HTTP ${response.status}`);
   }
 
-  return data;
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    onChunk(decoder.decode(value, { stream: true }));
+  }
 }
 
 chatForm.addEventListener('submit', async (event) => {
@@ -143,17 +145,38 @@ chatForm.addEventListener('submit', async (event) => {
   const message = messageInput.value.trim();
   if (!message) return;
 
+  // Historique AVANT d'ajouter le message courant (envoyé séparément au backend)
+  const historySnapshot = history
+    .filter((item) => item.role === 'user' || item.role === 'assistant')
+    .slice(-12);
+
   messageInput.value = '';
   addMessage('user', message);
+
+  // Bulle assistant vide qui se remplira au fil du streaming
+  history.push({ role: 'assistant', content: '' });
+  renderMessages();
+  const liveEl = messagesContainer.querySelector('.message:last-child .message-content');
+  const assistantMsg = history[history.length - 1];
+
   setSending(true);
 
   try {
-    const data = await sendMessage(message);
-    addMessage('assistant', data.answer || 'Réponse vide.');
-    setStatus(data.blocked ? 'warning' : 'online', data.blocked ? 'Réponse bloquée par sécurité' : 'Connecté', data.model);
+    await sendMessageStream(message, historySnapshot, (chunk) => {
+      assistantMsg.content += chunk;
+      if (liveEl) liveEl.innerHTML = formatContent(assistantMsg.content);
+      messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    });
+
+    if (!assistantMsg.content) {
+      assistantMsg.content = 'Réponse vide.';
+      if (liveEl) liveEl.innerHTML = formatContent(assistantMsg.content);
+    }
+    saveHistory();
   } catch (error) {
-    const text = `Erreur : ${error.message}`;
-    addMessage('assistant', text);
+    assistantMsg.content = `Erreur : ${error.message}`;
+    if (liveEl) liveEl.innerHTML = formatContent(assistantMsg.content);
+    saveHistory();
     await checkHealth();
   } finally {
     setSending(false);
