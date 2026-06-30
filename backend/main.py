@@ -203,8 +203,9 @@ async def chat(request: ChatRequest, raw_request: Request) -> ChatResponse:
         "options": {
             "temperature": 0.3,
             "top_p": 0.8,
-            "num_predict": 512,
+            "num_predict": 220,
             "repeat_penalty": 1.1,
+            "stop": ["<|end|>", "<|endoftext|>", "<|user|>"],
         },
     }
 
