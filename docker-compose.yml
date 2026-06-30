@@ -39,7 +39,7 @@ services:
       - "8000:8000"
     environment:
       OLLAMA_BASE_URL: http://host.docker.internal:11434
-      OLLAMA_MODEL: techcorp-financial
+      OLLAMA_MODEL: phi3.5
       OLLAMA_TIMEOUT: 180
       MAX_MESSAGE_LENGTH: 4000
       MAX_HISTORY_MESSAGES: 12
